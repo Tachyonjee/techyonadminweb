@@ -1,0 +1,253 @@
+import { useState, useEffect } from "react";
+import {
+  Card,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+  Button,
+  IconButton,
+  Grid,
+} from "@mui/material";
+import { getClassList, getSubjects, getTopics, getSubtopics, insertQuestion } from "../apis/questionApi";
+import Editor from "../components/editor";
+
+
+const QuestionSetup = () => {
+  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [subtopics, setSubtopics] = useState([]);
+  const [formData, setFormData] = useState({
+    class: "",
+    subject: "",
+    topic: "",
+    subtopic: "",
+    difficulty: "",
+    questionType: "",
+    questionText: "",
+    options: { a: "", b: "", c: "", d: "" },
+    questionImage: null,
+    correctAnswerOption: "",
+    correctAnswerText: "",
+    answerExplanation: "",
+  });
+
+  const [editorHtml, setEditorHtml] = useState("");
+
+
+  useEffect(() => {
+    getClassList().then(setClasses);
+  }, []);
+
+  useEffect(() => {
+    if (formData.class) getSubjects(formData.class).then(setSubjects);
+  }, [formData.class]);
+
+  useEffect(() => {
+    if (formData.subject) getTopics(formData.subject).then(setTopics);
+  }, [formData.subject]);
+
+  useEffect(() => {
+    if (formData.topic) getSubtopics(formData.topic).then(setSubtopics);
+  }, [formData.topic]);
+
+  const handleChange = (e) => {
+    // if(e.target.name==="")
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleImageUpload = (e) => {
+    setFormData({ ...formData, questionImage: e.target.files[0] });
+  };
+
+  const handleSubmit = async () => {
+    // Transform form data before submission
+    const submissionData = {
+      ...formData,
+      classId: formData.class,
+      subjectId: formData.subject,
+      topicId: formData.topic,
+      subtopicId: formData.subtopic,
+    };
+  
+    // Remove old keys
+    delete submissionData.class;
+    delete submissionData.subject;
+    delete submissionData.topic;
+    delete submissionData.subtopic;
+  
+    console.log("Submitting Data:", submissionData);
+  
+    try {
+      await insertQuestion(submissionData);
+      alert("Question submitted successfully!");
+  
+      // Reset form after submission
+      setFormData({
+        class: "",
+        subject: "",
+        topic: "",
+        subtopic: "",
+        difficulty: "",
+        questionType: "",
+        questionText: "",
+        options: { a: "", b: "", c: "", d: "" },
+        questionImage: null,
+        correctAnswerOption: "",
+        correctAnswerText: "",
+        answerExplanation: "",
+      });
+    } catch (error) {
+      console.error("Error submitting question:", error);
+      alert("Failed to submit question.");
+    }
+  };
+  
+
+  return (
+    <div className="p-24">
+      <Card className="p-16 shadow-lg rounded-xl">
+      <h1 className="text-2xl font-semibold mb-4">Question Setup</h1>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          {["class", "subject", "topic"].map(
+            (field, index) => (
+              <FormControl variant="standard" key={index} fullWidth>
+                <InputLabel>{field.charAt(0).toUpperCase() + field.slice(1)}</InputLabel>
+                <Select
+                  name={field}
+                  value={formData[field]}
+                  onChange={handleChange}
+                >
+                  {eval(field == "class" ? field + "es" : field + "s").map((item) => (
+                    <MenuItem key={item._id} value={item._id}>
+                      {item.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )
+          )}
+
+        </div>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="mb-4">
+            <FormControl variant="standard" fullWidth>
+              <InputLabel>Subtopics</InputLabel>
+              <Select
+                name={"subtopic"}
+                value={formData["subtopic"]}
+                onChange={handleChange}
+              >
+                {subtopics.map((item) => (
+                  <MenuItem key={item._id} value={item._id}>
+                    {item.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </div>
+          <div className="mb-4">
+            <FormControl variant="standard" fullWidth>
+              <InputLabel>Difficulty</InputLabel>
+              <Select
+                name="difficulty"
+                value={formData.difficulty}
+                onChange={handleChange}
+              >
+                <MenuItem value="easy">Easy</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="hard">Hard</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+          <div className="mb-4">
+            <FormControl variant="standard" fullWidth>
+              <InputLabel id="demo-simple-select-label">Question Type</InputLabel>
+              <Select
+                name="questionType"
+                value={formData.questionType}
+                onChange={handleChange}
+              >
+                <MenuItem value="mcq">MCQ</MenuItem>
+                <MenuItem value="short">Short Answer</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <Editor
+            value={formData.questionText}
+            onChange={(html) => setFormData({ ...formData, questionText: html === "<p><br></p>" ? "" : html })}
+            placeholder="Enter Question (Supports LaTeX)"
+            label={"Question"}
+          />
+        </div>
+        {formData?.questionType === "mcq" && (
+          <Grid container spacing={3}>
+          {["a", "b", "c", "d"].map((key) => (
+            <Grid item xs={12} sm={6} key={key}>
+              <Editor
+               key={key}
+                label={`Option ${key.toUpperCase()}`}
+                value={formData.options[key]}
+                onChange={(html) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    options: { ...prev.options, [key]: html === "<p><br></p>" ? "" : html },
+                  }));
+                }}
+                placeholder="Enter Option (Supports LaTeX)"
+              />
+            </Grid>
+          ))}
+        </Grid>
+        )}
+
+
+        {formData?.questionType === "mcq" && (
+        <div className="mb-4 mt-8">
+          <FormControl variant="standard" fullWidth>
+            <InputLabel>Correct Answer Option</InputLabel>
+            <Select
+              name="correctAnswerOption"
+              value={formData["correctAnswerOption"]}
+              onChange={handleChange}
+            >
+              <MenuItem value="a">A</MenuItem>
+              <MenuItem value="b">B</MenuItem>
+              <MenuItem value="c">C</MenuItem>
+              <MenuItem value="d">D</MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+      )}
+        {formData?.questionType !== "mcq" && <div className="mb-4">
+          <Editor
+            value={formData.correctAnswerText}
+            onChange={(html) => setFormData({ ...formData, correctAnswerText: html === "<p><br></p>" ? "" : html })}
+            placeholder="Enter Correct Answer"
+            label={"Correct Answer"}
+          />
+        </div>}
+
+        <div className="mb-4">
+          <Editor
+            value={formData.answerExplanation}
+            onChange={(html) => setFormData({ ...formData, answerExplanation: html === "<p><br></p>" ? "" : html })}
+            placeholder="Enter Correct Answer"
+            label={"Answer Explanation"}
+          />
+        </div>
+
+        <Button variant="contained" color="primary" onClick={handleSubmit}>
+          Submit
+        </Button>
+      </Card>
+    </div>
+  );
+};
+
+export default QuestionSetup;
