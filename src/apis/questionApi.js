@@ -2,6 +2,26 @@ import axios from "axios";
 
 const API_BASE_URL = "http://localhost:5000/api"; // Replace with actual API URL
 
+export const loginUser = async (userData) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/users/login`, userData);
+    return response.data;
+  } catch (error) {
+    console.error("Login error:", error);
+    throw error;
+  }
+};
+
+// ✅ Register API
+export const registerUser = async (userData) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/users/register`, userData);
+    return response.data; // Expecting { message, role, user }
+  } catch (error) {
+    console.error("Registration error:", error);
+    throw error;
+  }
+};
 
 export const getClassList = async () => {
   try {

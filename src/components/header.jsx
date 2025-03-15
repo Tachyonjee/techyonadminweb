@@ -22,6 +22,7 @@ const Header = () => {
         margin: 'auto',
         width:"90%",
         px: 2,
+        top:10
       }}
     >
       <Toolbar disableGutters className="flex justify-between w-full">

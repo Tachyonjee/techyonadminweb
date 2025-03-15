@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TextField,
   Button,
@@ -8,7 +8,12 @@ import {
   InputLabel,
   FormHelperText,
   Typography,
+  Snackbar,
+  Alert 
 } from '@mui/material';
+import { getSubjects,registerUser } from '../../apis/questionApi';
+import { useNavigate } from 'react-router-dom';
+
 
 export default function Signup() {
   const [formData, setFormData] = useState({
@@ -23,6 +28,8 @@ export default function Signup() {
   });
 
   const [errors, setErrors] = useState({});
+  const [subjects, setSubjects] = useState([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -39,13 +46,57 @@ export default function Signup() {
     return Object.keys(tempErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const navigate = useNavigate(); // For redirection
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (validate()) {
       console.log('Submitting form: ', formData);
-      // TODO: API call here
+      try {
+        const response = await registerUser(formData); // Call registration API
+        console.log("Registration successful:", response);
+        const { role, message } = response?.user; // Assuming backend sends role and message
+
+        // Show success snackbar
+        setSnackbar({ open: true, message: message || 'Registration successful!', severity: 'success' });
+
+        // Redirect after a short delay to show snackbar
+        setTimeout(() => {
+          if (role === 'admin') navigate('/admin/questionSetup');
+          else if (role === 'teacher') navigate('/teacher/dashboard');
+          else if (role === 'student') navigate('/student/dashboard');
+          else navigate('/'); // Default fallback route
+        }, 1500); // 1.5 seconds delay for snackbar visibility
+
+        // Optional: Clear form
+        setFormData({
+          name: '',
+          username: '',
+          password: '',
+          mobileNumber: '',
+          email: '',
+          role: '',
+          subject: '',
+          class: '',
+        });
+
+      } catch (error) {
+        console.error("Registration error:", error);
+        const errorMessage = error.response?.data?.message || "Registration failed, please try again.";
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+      }
     }
   };
+
+  // Snackbar close handler
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  useEffect(() => {
+    if (formData.role === "teacher") getSubjects("67c54b7099a8bfbeaebedfd9").then(setSubjects);
+  }, [formData.class]);
 
   return (
     <div className="min-h-screen flex items-center justify-center  px-4 ">
@@ -133,10 +184,25 @@ export default function Signup() {
               value={formData.role}
               onChange={handleChange}
             >
-              <MenuItem value="Teacher">Teacher</MenuItem>
-              <MenuItem value="Student">Student</MenuItem>
+              <MenuItem value="admin">Admim</MenuItem>
+              <MenuItem value="teacher">Teacher</MenuItem>
+              <MenuItem value="student">Student</MenuItem>
             </Select>
             <FormHelperText>{errors.role}</FormHelperText>
+          </FormControl>
+
+          {/* Class */}
+          <FormControl fullWidth variant="standard" error={!!errors.class}>
+            <InputLabel>Class</InputLabel>
+            <Select
+              name="class"
+              value={formData.class}
+              onChange={handleChange}
+            >
+              <MenuItem value="Class 11">Class 11</MenuItem>
+              <MenuItem value="Class 12">Class 12</MenuItem>
+            </Select>
+            <FormHelperText>{errors.class}</FormHelperText>
           </FormControl>
 
           {/* Subject for Teacher */}
@@ -156,19 +222,7 @@ export default function Signup() {
             </FormControl>
           )}
 
-          {/* Class */}
-          <FormControl fullWidth variant="standard" error={!!errors.class}>
-            <InputLabel>Class</InputLabel>
-            <Select
-              name="class"
-              value={formData.class}
-              onChange={handleChange}
-            >
-              <MenuItem value="Class 11">Class 11</MenuItem>
-              <MenuItem value="Class 12">Class 12</MenuItem>
-            </Select>
-            <FormHelperText>{errors.class}</FormHelperText>
-          </FormControl>
+
 
           {/* Submit */}
           <Button
@@ -181,6 +235,16 @@ export default function Signup() {
           </Button>
         </form>
       </div>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
