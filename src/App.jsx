@@ -9,6 +9,9 @@ import SignUp from "./pages/auth/signup";
 import AdminDashboard from "./pages/AdminDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
+import PublicRoute from "./Routes/PublicRoute";
+import ProtectedRoute from "./Routes/ProtectedRoute";
+
 
 const theme = createTheme({
   palette: {
@@ -19,20 +22,23 @@ const theme = createTheme({
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600">
-      <Header></Header>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/signin" element={<Login />} />
-          <Route path="/signUp" element={<SignUp />} />
-          <Route path="/admin/question-setup" element={<QuestionSetup />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
-          <Route path="/student/dashboard" element={<StudentDashboard />} />
-        </Routes>
-        </div>
-    </ThemeProvider>
+    <CssBaseline />
+    <div className="bg-gradient-to-r from-blue-500 to-purple-600 min-h-screen">
+      <Header />
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/signin" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/signUp" element={<PublicRoute><SignUp /></PublicRoute>} />
+
+        {/* Protected Routes */}
+        <Route path="/admin/question-setup" element={<ProtectedRoute><QuestionSetup /></ProtectedRoute>} />
+        <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/teacher/dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
+        <Route path="/student/dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+      </Routes>
+    </div>
+  </ThemeProvider>
   );
 }
 

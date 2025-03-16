@@ -40,6 +40,11 @@ const Login = () => {
         message: "Login successful!",
         severity: "success",
       });
+      localStorage.setItem('user', JSON.stringify(result.user));
+      localStorage.setItem('role', result.role);
+      localStorage.setItem('token', result.token); // if token is provided
+
+      // ✅ Route based on role
       let role = result?.role;
       if (role === 'admin') navigate('/admin/question-setup');
       else if (role === 'teacher') navigate('/teacher/dashboard');

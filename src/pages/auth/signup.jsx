@@ -60,7 +60,9 @@ export default function Signup() {
 
         // Show success snackbar
         setSnackbar({ open: true, message: message || 'Registration successful!', severity: 'success' });
-
+        localStorage.setItem('user', JSON.stringify(response.user));
+        localStorage.setItem('role', response.role);
+        localStorage.setItem('token', response.token);
         // Redirect after a short delay to show snackbar
         setTimeout(() => {
           if (role === 'admin') navigate('/admin/questionSetup');
