@@ -10,8 +10,10 @@ import {
   IconButton,
   Grid,
 } from "@mui/material";
-import { getClassList, getSubjects, getTopics, getSubtopics, insertQuestion } from "../apis/questionApi";
+import { getClassList, getSubjects, getTopics, getSubtopics, insertQuestion, updateQuestion } from "../apis/questionApi";
 import Editor from "../components/editor";
+import { useLocation, useNavigate } from 'react-router-dom';
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 
 const QuestionSetup = () => {
@@ -19,19 +21,22 @@ const QuestionSetup = () => {
   const [subjects, setSubjects] = useState([]);
   const [topics, setTopics] = useState([]);
   const [subtopics, setSubtopics] = useState([]);
+  const location = useLocation();
+  const questionToEdit = location.state?.question;
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
-    class: "",
-    subject: "",
-    topic: "",
-    subtopic: "",
-    difficulty: "",
-    questionType: "",
-    questionText: "",
-    options: { a: "", b: "", c: "", d: "" },
-    questionImage: null,
-    correctAnswerOption: "",
-    correctAnswerText: "",
-    answerExplanation: "",
+    class: questionToEdit?.classId || "",
+    subject: questionToEdit?.subjectId || "",
+    topic: questionToEdit?.topicId || "",
+    subtopic: questionToEdit?.subtopicId || "",
+    difficulty: questionToEdit?.difficulty || "",
+    questionType: questionToEdit?.questionType || "",
+    questionText: questionToEdit?.questionText || "",
+    options: questionToEdit?.options || { a: "", b: "", c: "", d: "" },
+    questionImage: questionToEdit?.questionImage || null,
+    correctAnswerOption: questionToEdit?.correctAnswerOption || "",
+    correctAnswerText: questionToEdit?.correctAnswerText || "",
+    answerExplanation: questionToEdit?.answerExplanation || "",
   });
 
   const [editorHtml, setEditorHtml] = useState("");
@@ -71,19 +76,23 @@ const QuestionSetup = () => {
       topicId: formData.topic,
       subtopicId: formData.subtopic,
     };
-  
+
     // Remove old keys
     delete submissionData.class;
     delete submissionData.subject;
     delete submissionData.topic;
     delete submissionData.subtopic;
-  
-    console.log("Submitting Data:", submissionData);
-  
+
+
     try {
-      await insertQuestion(submissionData);
-      alert("Question submitted successfully!");
-  
+      if (questionToEdit?._id) {
+        await updateQuestion(submissionData, questionToEdit?._id);
+        alert("Question updated successfully!");
+        navigate('/admin/questions');
+      } else {
+        await insertQuestion(submissionData);
+        alert("Question submitted successfully!");
+      }
       // Reset form after submission
       setFormData({
         class: "",
@@ -104,12 +113,18 @@ const QuestionSetup = () => {
       alert("Failed to submit question.");
     }
   };
-  
+
 
   return (
     <div className="p-24">
-      <Card className="p-16 shadow-lg rounded-xl">
-      <h1 className="text-2xl font-semibold mb-4">Question Setup</h1>
+      <Card className="p-16 shadow-lg rounded-xl bg-gradient-to-r from-blue-100 to-blue-150 min-h-screen">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-semibold mb-4">Question Setup</h1>
+          {questionToEdit?._id&&<IconButton onClick={() => navigate(-1)} className="mr-2 ">
+            <ArrowBackIcon /> <span>Back</span>
+          </IconButton>}
+        </div>
+
         <div className="grid grid-cols-3 gap-4 mb-4">
           {["class", "subject", "topic"].map(
             (field, index) => (
@@ -187,43 +202,43 @@ const QuestionSetup = () => {
         </div>
         {formData?.questionType === "mcq" && (
           <Grid container spacing={3}>
-          {["a", "b", "c", "d"].map((key) => (
-            <Grid item xs={12} sm={6} key={key}>
-              <Editor
-               key={key}
-                label={`Option ${key.toUpperCase()}`}
-                value={formData.options[key]}
-                onChange={(html) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    options: { ...prev.options, [key]: html === "<p><br></p>" ? "" : html },
-                  }));
-                }}
-                placeholder="Enter Option (Supports LaTeX)"
-              />
-            </Grid>
-          ))}
-        </Grid>
+            {["a", "b", "c", "d"].map((key) => (
+              <Grid item xs={12} sm={6} key={key}>
+                <Editor
+                  key={key}
+                  label={`Option ${key.toUpperCase()}`}
+                  value={formData.options[key]}
+                  onChange={(html) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      options: { ...prev.options, [key]: html === "<p><br></p>" ? "" : html },
+                    }));
+                  }}
+                  placeholder="Enter Option (Supports LaTeX)"
+                />
+              </Grid>
+            ))}
+          </Grid>
         )}
 
 
         {formData?.questionType === "mcq" && (
-        <div className="mb-4 mt-8">
-          <FormControl variant="standard" fullWidth>
-            <InputLabel>Correct Answer Option</InputLabel>
-            <Select
-              name="correctAnswerOption"
-              value={formData["correctAnswerOption"]}
-              onChange={handleChange}
-            >
-              <MenuItem value="a">A</MenuItem>
-              <MenuItem value="b">B</MenuItem>
-              <MenuItem value="c">C</MenuItem>
-              <MenuItem value="d">D</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-      )}
+          <div className="mb-4 mt-8">
+            <FormControl variant="standard" fullWidth>
+              <InputLabel>Correct Answer Option</InputLabel>
+              <Select
+                name="correctAnswerOption"
+                value={formData["correctAnswerOption"]}
+                onChange={handleChange}
+              >
+                <MenuItem value="a">A</MenuItem>
+                <MenuItem value="b">B</MenuItem>
+                <MenuItem value="c">C</MenuItem>
+                <MenuItem value="d">D</MenuItem>
+              </Select>
+            </FormControl>
+          </div>
+        )}
         {formData?.questionType !== "mcq" && <div className="mb-4">
           <Editor
             value={formData.correctAnswerText}

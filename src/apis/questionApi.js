@@ -35,7 +35,7 @@ export const getClassList = async () => {
 
 export const getSubjects = async (classId) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/upload/subjects/${classId}`);
+    const response = await axios.get(`${API_BASE_URL}/upload/subjects`);
     return response.data;
   } catch (error) {
     console.error("Error fetching subjects:", error);
@@ -69,6 +69,34 @@ export const insertQuestion = async (questionData) => {
     return response.data;
   } catch (error) {
     console.error("Error inserting question:", error);
+    throw error;
+  }
+};
+
+
+// Fetch questions by topic
+export const getQuestionsByTopic = async (topicId) => {
+  const response = await axios.get(`${API_BASE_URL}/questions/topic/${topicId}`);
+  return response.data;
+};
+
+// Fetch questions by subtopic
+export const getQuestionsBySubtopic = async (subtopicId) => {
+  const response = await axios.get(`${API_BASE_URL}/questions/subtopic/${subtopicId}`);
+  return response.data;
+};
+
+export const getQuestionsBySubject = async (subjectId) => {
+  const response = await axios.get(`${API_BASE_URL}/questions/subject/${subjectId}`);
+  return response.data;
+};
+
+export const updateQuestion = async (questionData,id) => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/questions/${id}`, questionData);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating question:", error);
     throw error;
   }
 };
