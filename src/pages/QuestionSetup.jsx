@@ -14,13 +14,17 @@ import { getClassList, getSubjects, getTopics, getSubtopics, insertQuestion, upd
 import Editor from "../components/editor";
 import { useLocation, useNavigate } from 'react-router-dom';
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-
+import Loader from "../components/loader"
+import ServerMessage from "../components/serverMessage";
+import SERVERCODETYPE from "../utils/constants"
 
 const QuestionSetup = () => {
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [topics, setTopics] = useState([]);
   const [subtopics, setSubtopics] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [serverMessage, setServerMessage] = useState({type:"",message:""});
   const location = useLocation();
   const questionToEdit = location.state?.question;
   const navigate = useNavigate()
@@ -85,16 +89,23 @@ const QuestionSetup = () => {
 
 
     try {
+    setLoading(true);
       if (questionToEdit?._id) {
         await updateQuestion(submissionData, questionToEdit?._id);
-        alert("Question updated successfully!");
+        setLoading(false);
         navigate('/admin/questions');
       } else {
-        await insertQuestion(submissionData);
-        alert("Question submitted successfully!");
+        const response = await insertQuestion(submissionData);
+        if(response?.message==="Question inserted successfully"){
+          setServerMessage({type:SERVERCODETYPE.SUCCESS, message:response?.message})
+        }else{
+          setServerMessage({type:SERVERCODETYPE.ERROR, message:response?.message})
+        }
+        setLoading(false)
       }
       // Reset form after submission
-      setFormData({
+      setFormData((prevData) => ({
+        ...prevData,
         class: "",
         subject: "",
         topic: "",
@@ -106,11 +117,12 @@ const QuestionSetup = () => {
         questionImage: null,
         correctAnswerOption: "",
         correctAnswerText: "",
-        answerExplanation: "",
-      });
+        answerExplanation: "", // Reset answerExplanation properly
+      }));
     } catch (error) {
       console.error("Error submitting question:", error);
-      alert("Failed to submit question.");
+      setServerMessage({type:SERVERCODETYPE.ERROR, message:error?.message})
+      setLoading(false);
     }
   };
 
@@ -124,7 +136,7 @@ const QuestionSetup = () => {
             <ArrowBackIcon /> <span>Back</span>
           </IconButton>}
         </div>
-
+        {loading &&<Loader loading={loading} />}
         <div className="grid grid-cols-3 gap-4 mb-4">
           {["class", "subject", "topic"].map(
             (field, index) => (
@@ -195,7 +207,12 @@ const QuestionSetup = () => {
         <div className="mb-4">
           <Editor
             value={formData.questionText}
-            onChange={(html) => setFormData({ ...formData, questionText: html === "<p><br></p>" ? "" : html })}
+            onChange={(html) =>
+              setFormData((prevData) => ({
+                ...prevData,
+                questionText: html === "<p><br></p>" ? "" : html,
+              }))
+            }  
             placeholder="Enter Question (Supports LaTeX)"
             label={"Question"}
           />
@@ -251,8 +268,12 @@ const QuestionSetup = () => {
         <div className="mb-4">
           <Editor
             value={formData.answerExplanation}
-            onChange={(html) => setFormData({ ...formData, answerExplanation: html === "<p><br></p>" ? "" : html })}
-            placeholder="Enter Correct Answer"
+            onChange={(html) =>
+              setFormData((prevData) => ({
+                ...prevData,
+                answerExplanation: html === "<p><br></p>" ? "" : html,
+              }))
+            }              placeholder="Enter Correct Answer"
             label={"Answer Explanation"}
           />
         </div>
@@ -261,6 +282,7 @@ const QuestionSetup = () => {
           Submit
         </Button>
       </Card>
+      <ServerMessage type={serverMessage?.type} message={serverMessage?.message} open={serverMessage?.message} onClose={()=>setServerMessage({})}></ServerMessage>
     </div>
   );
 };

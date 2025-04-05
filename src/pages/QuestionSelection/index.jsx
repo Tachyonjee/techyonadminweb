@@ -12,6 +12,7 @@ const QuestionSelection = () => {
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
   const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Fetch topics on mount
   useEffect(() => {

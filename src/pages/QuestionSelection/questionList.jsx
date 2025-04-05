@@ -17,7 +17,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EditIcon from "@mui/icons-material/Edit";
 import { useNavigate } from "react-router-dom";
-import { getSubjects, getTopics, getSubtopics, getQuestionsByTopic, getQuestionsBySubtopic, getQuestionsBySubject } from "../../apis/questionApi";
+import { getSubjects, getTopics, getSubtopics, getQuestionsByTopic, getQuestionsBySubtopic, getQuestionsBySubject, updateQuestion } from "../../apis/questionApi";
 import { MathJaxContext } from "better-react-mathjax";
 import Latex from 'react-latex-next';
 import 'katex/dist/katex.min.css';
@@ -29,7 +29,9 @@ const QuestionList = () => {
     const [subjects, setSubjects] = useState([]);
     const [topics, setTopics] = useState([]);
     const [subtopics, setSubtopics] = useState([]);
+    const [classes, setClasses] = useState([]);
 
+    const [selectedClass, setSelectedClass] = useState("");
     const [selectedSubject, setSelectedSubject] = useState("");
     const [selectedTopic, setSelectedTopic] = useState("");
     const [selectedSubtopic, setSelectedSubtopic] = useState("");
@@ -37,71 +39,92 @@ const QuestionList = () => {
     const [questions, setQuestions] = useState([]);
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
-    // Fetch subjects on component mount
     useEffect(() => {
-        setLoading(true);
-        getSubjects()
-            .then(setSubjects)
-            .catch(() => showError("Failed to fetch subjects"))
-            .finally(() => setLoading(false));
+        fetchClasses();
     }, []);
 
-    // Fetch topics when subject is selected
+    useEffect(() => {
+        if (selectedClass) {
+            fetchSubjects();
+        }
+    }, [selectedClass]);
+
     useEffect(() => {
         if (selectedSubject) {
-            getTopics(selectedSubject)
-                .then(setTopics)
-                .catch(() => showError("Failed to fetch topics"))
-                .finally(() => setLoading(false));
-
-            setSelectedTopic("");
-            setSubtopics([]);
-            setSelectedSubtopic("");
-            setQuestions([]);
+            fetchTopics();
         }
     }, [selectedSubject]);
-    
+
     useEffect(() => {
         if (selectedTopic) {
-            getSubtopics(selectedTopic)
-                .then(setSubtopics)
-                .catch(() => showError("Failed to fetch subtopics"))
-                .finally(() => setLoading(false));
-
-            setSelectedSubtopic("");
-            setQuestions([]);
+            fetchSubtopics();
         }
     }, [selectedTopic]);
 
-    // Fetch questions based on topic, subtopic, or subject
     useEffect(() => {
         if (selectedSubtopic) {
-            setLoading(true);
-            getQuestionsBySubtopic(selectedSubtopic)
-                .then(setQuestions)
-                .catch(() => showError("Failed to fetch questions"))
-                .finally(() => setLoading(false));
-        } else if (selectedTopic) {
-            setLoading(true);
-            getQuestionsByTopic(selectedTopic)
-                .then(setQuestions)
-                .catch(() => showError("Failed to fetch questions"))
-                .finally(() => setLoading(false));
-        } else if (selectedSubject) {
-            setLoading(true);
-            getQuestionsBySubject(selectedSubject)
-                .then((data)=>{
-                    console.log("data", data)
-                    if(data){
-                        setQuestions(data);
-                        setLoading(false)
-                    }
-                })
-                .catch(() => showError("Failed to fetch questions"))
-                .finally(() => setLoading(false));
+            fetchQuestions();
         }
-    }, [selectedTopic, selectedSubtopic, selectedSubject]);
+    }, [selectedSubtopic]);
 
+    const fetchClasses = async () => {
+        const classList = await getClassList();
+        setClasses(classList);
+    };
+
+    const fetchSubjects = async () => {
+        const subjectList = await getSubjects(selectedClass);
+        setSubjects(subjectList);
+    };
+
+    const fetchTopics = async () => {
+        const topicList = await getTopics(selectedSubject);
+        setTopics(topicList);
+    };
+
+    const fetchSubtopics = async () => {
+        const subtopicList = await getSubtopics(selectedTopic);
+        setSubtopics(subtopicList);
+    };
+
+    const fetchQuestions = async () => {
+        if (!selectedSubtopic && !selectedTopic && !selectedSubject) {
+            setQuestions([]);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            let questionsData = [];
+            
+            if (selectedSubtopic) {
+                if (!user?.role || !user?.id) {
+                    throw new Error('User role and ID are required');
+                }
+                questionsData = await getQuestionsBySubtopic(selectedSubtopic, user.role, user.id);
+            } else if (selectedTopic) {
+                if (!user?.role || !user?.id) {
+                    throw new Error('User role and ID are required');
+                }
+                questionsData = await getQuestionsByTopic(selectedTopic, user.role, user.id);
+            } else if (selectedSubject) {
+                if (!user?.role || !user?.id) {
+                    throw new Error('User role and ID are required');
+                }
+                questionsData = await getQuestionsBySubject(selectedSubject, user.role, user.id);
+            }
+
+            // Filter questions based on user's access
+            const accessibleQuestions = questionsData.filter(question => canAccessQuestion(question));
+            setQuestions(accessibleQuestions);
+        } catch (error) {
+            console.error('Error fetching questions:', error);
+            showError(error.message || 'Failed to fetch questions');
+            setQuestions([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleEdit = (question) => {
         navigate('/admin/question-setup', { state: { question } });
@@ -120,9 +143,26 @@ const QuestionList = () => {
                     View & Edit Questions
                 </Typography>
                 <Grid container spacing={3} className="mb-6">
-                    {/* Subject */}
+                    {/* Class */}
                     <Grid item xs={12} sm={4}>
                         <FormControl fullWidth variant="standard">
+                            <InputLabel>Class</InputLabel>
+                            <Select
+                                value={selectedClass}
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                            >
+                                {classes.map((item) => (
+                                    <MenuItem key={item._id} value={item._id}>
+                                        {item.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    {/* Subject */}
+                    <Grid item xs={12} sm={4}>
+                        <FormControl fullWidth variant="standard" disabled={!selectedClass}>
                             <InputLabel>Subject</InputLabel>
                             <Select
                                 value={selectedSubject}
@@ -190,9 +230,9 @@ const QuestionList = () => {
                                             "No question text available"
                                         )}
                                     </Typography>
-                                    <IconButton onClick={() => handleEdit(q)} size="small">
-                                        <EditIcon />
-                                    </IconButton>
+                                        <IconButton onClick={() => handleEdit(q)} size="small">
+                                            <EditIcon />
+                                        </IconButton>
                                 </div>
                             </AccordionSummary>
 

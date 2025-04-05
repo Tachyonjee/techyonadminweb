@@ -72,9 +72,7 @@ export const insertQuestion = async (questionData) => {
     throw error;
   }
 };
-
-
-// Fetch questions by topic
+// Fetch questions with role-based filtering
 export const getQuestionsByTopic = async (topicId) => {
   const response = await axios.get(`${API_BASE_URL}/questions/topic/${topicId}`);
   return response.data;
@@ -86,6 +84,7 @@ export const getQuestionsBySubtopic = async (subtopicId) => {
   return response.data;
 };
 
+// Fetch questions by subject with role-based filtering
 export const getQuestionsBySubject = async (subjectId) => {
   const response = await axios.get(`${API_BASE_URL}/questions/subject/${subjectId}`);
   return response.data;
