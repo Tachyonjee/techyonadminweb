@@ -55,6 +55,7 @@ const QuestionList = () => {
             // For teachers, set their assigned class and subject
             if (user.class) {
                 setSelectedClass(user.class);
+                fetchClasses();
                 fetchSubjects(user.class);
             }
             if (user.subject) {
@@ -91,13 +92,21 @@ const QuestionList = () => {
     }, [selectedSubtopic]);
 
     const fetchClasses = async () => {
-        const classList = await getClassList();
-        setClasses(classList);
+        try {
+            const classList = await getClassList();
+            setClasses(Array.isArray(classList) ? classList : []);
+        } catch (error) {
+            setClasses([]);
+        }
     };
 
     const fetchSubjects = async (classId = selectedClass) => {
-        const subjectList = await getSubjects(classId);
-        setSubjects(subjectList);
+        try {
+            const subjectList = await getSubjects(classId);
+            setSubjects(Array.isArray(subjectList) ? subjectList : []);
+        } catch (error) {
+            setSubjects([]);
+        }
     };
 
     const fetchTopics = async () => {
@@ -122,22 +131,17 @@ const QuestionList = () => {
             
             if (selectedSubtopic) {
                 const response = await getQuestionsBySubtopic(selectedSubtopic);
-                console.log('Questions by subtopic response:', response);
                 questionsData = response?.data || [];
             } else if (selectedTopic) {
                 const response = await getQuestionsByTopic(selectedTopic);
-                console.log('Questions by topic response:', response);
                 questionsData = response?.data || [];
             } else if (selectedSubject) {
                 const response = await getQuestionsBySubject(selectedSubject);
-                console.log('Questions by subject response:', response);
                 questionsData = response?.data || [];
             }
 
-            console.log('Final questions data:', questionsData);
             setQuestions(Array.isArray(questionsData) ? questionsData : []);
         } catch (error) {
-            console.error('Error fetching questions:', error);
             const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch questions';
             showError(errorMessage);
             setQuestions([]);
@@ -147,7 +151,18 @@ const QuestionList = () => {
     };
 
     const handleEdit = (question) => {
-        navigate('/admin/question-setup', { state: { question } });
+        navigate('/admin/question-setup', { 
+            state: { 
+                question,
+                isEdit: true,
+                selectedValues: {
+                    class: selectedClass,
+                    subject: selectedSubject,
+                    topic: selectedTopic,
+                    subtopic: selectedSubtopic
+                }
+            } 
+        });
     };
 
     const showError = (msg) => {
@@ -155,6 +170,42 @@ const QuestionList = () => {
     };
 
     const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
+
+    const handleUpdate = async (questionId, updatedData) => {
+        try {
+            setLoading(true);
+            await updateQuestion(questionId, updatedData);
+            
+            setSnackbar({
+                open: true,
+                message: 'Question updated successfully!',
+                severity: 'success'
+            });
+
+            let updatedQuestions = [];
+            if (selectedSubtopic) {
+                const response = await getQuestionsBySubtopic(selectedSubtopic);
+                updatedQuestions = response?.data?.questions || [];
+            } else if (selectedTopic) {
+                const response = await getQuestionsByTopic(selectedTopic);
+                updatedQuestions = response?.data?.questions || [];
+            } else if (selectedSubject) {
+                const response = await getQuestionsBySubject(selectedSubject);
+                updatedQuestions = response?.data?.questions || [];
+            }
+
+            setQuestions(updatedQuestions);
+            navigate('/admin/questions');
+        } catch (error) {
+            setSnackbar({
+                open: true,
+                message: error.response?.data?.message || 'Failed to update question',
+                severity: 'error'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="p-24">
@@ -177,11 +228,15 @@ const QuestionList = () => {
                                         {classes.find(c => c._id === user.class)?.name || 'Loading...'}
                                     </MenuItem>
                                 ) : (
-                                    classes.map((item) => (
-                                        <MenuItem key={item._id} value={item._id}>
-                                            {item.name}
-                                        </MenuItem>
-                                    ))
+                                    classes.length > 0 ? (
+                                        classes.map((item) => (
+                                            <MenuItem key={item._id} value={item._id}>
+                                                {item.name}
+                                            </MenuItem>
+                                        ))
+                                    ) : (
+                                        <MenuItem disabled>No classes available</MenuItem>
+                                    )
                                 )}
                             </Select>
                         </FormControl>
@@ -201,11 +256,15 @@ const QuestionList = () => {
                                         {subjects.find(s => s._id === user.subject)?.name || 'Loading...'}
                                     </MenuItem>
                                 ) : (
-                                    subjects.map((item) => (
-                                        <MenuItem key={item._id} value={item._id}>
-                                            {item.name}
-                                        </MenuItem>
-                                    ))
+                                    subjects.length > 0 ? (
+                                        subjects.map((item) => (
+                                            <MenuItem key={item._id} value={item._id}>
+                                                {item.name}
+                                            </MenuItem>
+                                        ))
+                                    ) : (
+                                        <MenuItem disabled>No subjects available</MenuItem>
+                                    )
                                 )}
                             </Select>
                         </FormControl>

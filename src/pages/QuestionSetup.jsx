@@ -29,10 +29,10 @@ const QuestionSetup = () => {
   const questionToEdit = location.state?.question;
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
-    class: questionToEdit?.classId || "",
-    subject: questionToEdit?.subjectId || "",
-    topic: questionToEdit?.topicId || "",
-    subtopic: questionToEdit?.subtopicId || "",
+    class: location.state?.selectedValues?.class || questionToEdit?.classId || "",
+    subject: location.state?.selectedValues?.subject || questionToEdit?.subjectId || "",
+    topic: location.state?.selectedValues?.topic || questionToEdit?.topicId || "",
+    subtopic: location.state?.selectedValues?.subtopic || questionToEdit?.subtopicId || "",
     difficulty: questionToEdit?.difficulty || "",
     questionType: questionToEdit?.questionType || "",
     questionText: questionToEdit?.questionText || "",
@@ -93,7 +93,8 @@ const QuestionSetup = () => {
       if (questionToEdit?._id) {
         await updateQuestion(submissionData, questionToEdit?._id);
         setLoading(false);
-        navigate('/admin/questions');
+        navigate('/questions');
+         
       } else {
         const response = await insertQuestion(submissionData);
         if(response?.message==="Question inserted successfully"){

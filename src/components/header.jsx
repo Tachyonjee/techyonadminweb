@@ -52,9 +52,9 @@ export default function Header() {
   const getDashboardPath = () => {
     switch (role) {
       case 'admin':
-        return '/admin/question-setup';
+        return '/admin/dashboard';
       case 'teacher':
-        return '/questions';
+        return '/teacher/dashboard';
       case 'student':
         return '/student/dashboard';
       default:
@@ -62,7 +62,7 @@ export default function Header() {
     }
   };
 
-  const isQuestionRoute = location.pathname.includes('/questions');
+  const isQuestionRoute = location.pathname === '/questions' || location.pathname === '/questions/create';
   const isDashboardRoute = location.pathname === getDashboardPath();
 
   return (
