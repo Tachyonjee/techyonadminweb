@@ -12,6 +12,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import PublicRoute from "./Routes/PublicRoute";
 import ProtectedRoute from "./Routes/ProtectedRoute";
 import QuestionList from "./pages/QuestionSelection/questionList";
+import Questions from "./pages/Questions";
 
 
 const theme = createTheme({
@@ -38,6 +39,7 @@ function App() {
         <Route path="/teacher/dashboard" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
         <Route path="/student/dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
         <Route path="/admin/questions" element={<ProtectedRoute><QuestionList /></ProtectedRoute>} />
+        <Route path="/questions" element={<ProtectedRoute><QuestionList /></ProtectedRoute>} />
       </Routes>
     </div>
   </ThemeProvider>

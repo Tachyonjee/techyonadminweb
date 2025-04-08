@@ -1,21 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { register, clearError } from '../../redux/slices/authSlice';
+import { getRoles, getClassList, getSubjects } from '../../apis/questionApi';
 import {
+  Container,
+  Box,
+  Typography,
   TextField,
   Button,
-  MenuItem,
   Select,
+  MenuItem,
   FormControl,
   InputLabel,
-  FormHelperText,
-  Typography,
-  Snackbar,
-  Alert 
+  Alert,
+  CircularProgress,
+  Paper
 } from '@mui/material';
-import { getSubjects,registerUser } from '../../apis/questionApi';
-import { useNavigate } from 'react-router-dom';
-
 
 export default function Signup() {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { loading, error, role } = useSelector((state) => state.auth);
+  const [roles, setRoles] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -26,227 +35,360 @@ export default function Signup() {
     subject: '',
     class: '',
   });
-
   const [errors, setErrors] = useState({});
-  const [subjects, setSubjects] = useState([]);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  useEffect(() => {
+    // Fetch roles from API
+    const fetchRoles = async () => {
+      try {
+        const rolesData = await getRoles();
+        console.log("roles",rolesData);
+        if (Array.isArray(rolesData?.data)) {
+          setRoles(rolesData?.data);
+        } else {
+          console.error('Roles data is not an array:', rolesData);
+          setRoles([]);
+        }
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+        setRoles([]);
+      }
+    };
+    fetchRoles();
+  }, []);
+
+  useEffect(() => {
+    // Fetch classes from API
+    const fetchClasses = async () => {
+      try {
+        const classesData = await getClassList();
+        if (Array.isArray(classesData)) {
+          setClasses(classesData);
+        }
+      } catch (error) {
+        console.error('Error fetching classes:', error);
+      }
+    };
+    fetchClasses();
+  }, []);
+
+  useEffect(() => {
+    // Fetch subjects when class is selected and role is teacher
+    const fetchSubjects = async () => {
+      if (formData.class && getRoleName(formData.role) === 'teacher') {
+        try {
+          const subjectsData = await getSubjects(formData.class);
+          if (Array.isArray(subjectsData)) {
+            setSubjects(subjectsData);
+          }
+        } catch (error) {
+          console.error('Error fetching subjects:', error);
+          setSubjects([]);
+        }
+      } else {
+        setSubjects([]);
+      }
+    };
+    fetchSubjects();
+  }, [formData.class, formData.role]);
+
+  useEffect(() => {
+    // Clear error when component unmounts
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  useEffect(() => {
+    // Redirect if user is already logged in
+    if (role) {
+      if (role === 'admin') navigate('/admin/question-setup');
+      else if (role === 'teacher') navigate('/teacher/dashboard');
+      else if (role === 'student') navigate('/student/dashboard');
+    }
+  }, [role, navigate]);
+
+  const getRoleName = (roleId) => {
+    const role = roles.find(r => r._id === roleId);
+    return role ? role.name : '';
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    
+    // If role is changing, clear class and subject
+    if (name === 'role') {
+      setFormData({
+        ...formData,
+        role: value,
+        class: '',
+        subject: ''
+      });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
+    }
   };
 
   const validate = () => {
     let tempErrors = {};
     Object.entries(formData).forEach(([key, value]) => {
-      if (key === 'subject' && formData.role !== 'Teacher') return; // Skip subject for non-teachers
+      // Skip validation for subject if role is not teacher
+      if (key === 'subject' && getRoleName(formData.role) !== 'teacher') return;
+      // Skip validation for class if role is admin
+      if (key === 'class' && getRoleName(formData.role) === 'admin') return;
       if (!value) tempErrors[key] = 'This field is required';
     });
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
   };
 
-  const navigate = useNavigate(); // For redirection
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (validate()) {
-      console.log('Submitting form: ', formData);
       try {
-        const response = await registerUser(formData); // Call registration API
-        console.log("Registration successful:", response);
-        const { role, message } = response?.user; // Assuming backend sends role and message
+        // Prepare the data to send to API
+        const registrationData = {
+          name: formData.name,
+          username: formData.username,
+          password: formData.password,
+          mobileNumber: formData.mobileNumber,
+          email: formData.email,
+          roleId: formData.role,
+          classId: getRoleName(formData.role) === 'admin' ? null : formData.class,
+          subjectId: getRoleName(formData.role) === 'teacher' ? formData.subject : null
+        };
 
-        // Show success snackbar
-        setSnackbar({ open: true, message: message || 'Registration successful!', severity: 'success' });
-        localStorage.setItem('user', JSON.stringify(response.user));
-        localStorage.setItem('role', response.role);
-        localStorage.setItem('token', response.token);
-        // Redirect after a short delay to show snackbar
-        setTimeout(() => {
-          if (role === 'admin') navigate('/admin/questionSetup');
-          else if (role === 'teacher') navigate('/teacher/dashboard');
-          else if (role === 'student') navigate('/student/dashboard');
-          else navigate('/'); // Default fallback route
-        }, 1500); // 1.5 seconds delay for snackbar visibility
-
-        // Optional: Clear form
-        setFormData({
-          name: '',
-          username: '',
-          password: '',
-          mobileNumber: '',
-          email: '',
-          role: '',
-          subject: '',
-          class: '',
-        });
-
+        const result = await dispatch(register(registrationData)).unwrap();
+        if (result) {
+          // Navigation is handled by the useEffect above
+        }
       } catch (error) {
-        console.error("Registration error:", error);
-        const errorMessage = error.response?.data?.message || "Registration failed, please try again.";
-        setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+        // Error is handled by the auth slice
       }
     }
   };
 
-  // Snackbar close handler
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  useEffect(() => {
-    if (formData.role === "teacher") getSubjects("67c54b7099a8bfbeaebedfd9").then(setSubjects);
-  }, [formData.class]);
-
   return (
-    <div className="min-h-screen flex items-center justify-center  px-4 ">
-      <div className="relative bg-white rounded-xl shadow-lg p-6 pt-16 w-full max-w-md mt-20">
-        {/* Floating Header Card */}
-        <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-4 rounded-xl shadow-lg w-72 text-center">
-          <Typography variant="h6" className="font-bold">
-            Join us today
-          </Typography>
-          <Typography variant="body2">
-            Enter your email and password to register
-          </Typography>
-        </div>
-
-        {/* Form Fields */}
-        <form onSubmit={handleSubmit} className="space-y-5 mt-4">
-          {/* Name */}
-          <TextField
-            label="Name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            fullWidth
-            variant="standard"
-            error={!!errors.name}
-            helperText={errors.name}
-          />
-
-          {/* Username */}
-          <TextField
-            label="Username"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            fullWidth
-            variant="standard"
-            error={!!errors.username}
-            helperText={errors.username}
-          />
-
-          {/* Password */}
-          <TextField
-            label="Password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            fullWidth
-            variant="standard"
-            error={!!errors.password}
-            helperText={errors.password}
-          />
-
-          {/* Mobile Number */}
-          <TextField
-            label="Mobile Number"
-            name="mobileNumber"
-            type="tel"
-            value={formData.mobileNumber}
-            onChange={handleChange}
-            fullWidth
-            variant="standard"
-            error={!!errors.mobileNumber}
-            helperText={errors.mobileNumber}
-          />
-
-          {/* Email */}
-          <TextField
-            label="Email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            fullWidth
-            variant="standard"
-            error={!!errors.email}
-            helperText={errors.email}
-          />
-
-          {/* Role */}
-          <FormControl fullWidth variant="standard" error={!!errors.role}>
-            <InputLabel>Role</InputLabel>
-            <Select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-            >
-              <MenuItem value="admin">Admim</MenuItem>
-              <MenuItem value="teacher">Teacher</MenuItem>
-              <MenuItem value="student">Student</MenuItem>
-            </Select>
-            <FormHelperText>{errors.role}</FormHelperText>
-          </FormControl>
-
-          {/* Class */}
-          <FormControl fullWidth variant="standard" error={!!errors.class}>
-            <InputLabel>Class</InputLabel>
-            <Select
-              name="class"
-              value={formData.class}
-              onChange={handleChange}
-            >
-              <MenuItem value="Class 11">Class 11</MenuItem>
-              <MenuItem value="Class 12">Class 12</MenuItem>
-            </Select>
-            <FormHelperText>{errors.class}</FormHelperText>
-          </FormControl>
-
-          {/* Subject for Teacher */}
-          {formData.role === 'Teacher' && (
-            <FormControl fullWidth variant="standard" error={!!errors.subject}>
-              <InputLabel>Subject</InputLabel>
-              <Select
-                name="subject"
-                value={formData.subject}
-                onChange={handleChange}
-              >
-                <MenuItem value="Physics">Physics</MenuItem>
-                <MenuItem value="Chemistry">Chemistry</MenuItem>
-                <MenuItem value="Mathematics">Mathematics</MenuItem>
-              </Select>
-              <FormHelperText>{errors.subject}</FormHelperText>
-            </FormControl>
-          )}
-
-
-
-          {/* Submit */}
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            className="bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 rounded-lg shadow-md"
-          >
-            Sign Up
-          </Button>
-        </form>
-      </div>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </div>
+        <Paper
+          elevation={3}
+          sx={{
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%',
+            borderRadius: 2,
+            position: 'relative',
+            overflow: 'visible',
+            backgroundColor: 'white',
+          }}
+        >
+          <Box
+            sx={{
+              backgroundColor: 'primary.main',
+              color: 'white',
+              padding: '16px 32px',
+              borderRadius: '16px',
+              position: 'absolute',
+              top: '-32px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              textAlign: 'center',
+              boxShadow: 3,
+              width: '80%',
+              maxWidth: '400px',
+            }}
+          >
+            <Typography variant="h5" component="h1">
+              Create Account
+            </Typography>
+            <Typography variant="body2">
+              Sign up to get started
+            </Typography>
+          </Box>
+
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 4, width: '100%' }}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="name"
+              label="Name"
+              name="name"
+              autoComplete="name"
+              autoFocus
+              value={formData.name}
+              onChange={handleChange}
+              error={!!errors.name}
+              helperText={errors.name}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="username"
+              label="Username"
+              name="username"
+              autoComplete="username"
+              value={formData.username}
+              onChange={handleChange}
+              error={!!errors.username}
+              helperText={errors.username}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
+              label="Password"
+              type="password"
+              id="password"
+              autoComplete="new-password"
+              value={formData.password}
+              onChange={handleChange}
+              error={!!errors.password}
+              helperText={errors.password}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="mobileNumber"
+              label="Mobile Number"
+              name="mobileNumber"
+              autoComplete="tel"
+              value={formData.mobileNumber}
+              onChange={handleChange}
+              error={!!errors.mobileNumber}
+              helperText={errors.mobileNumber}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Email Address"
+              name="email"
+              autoComplete="email"
+              value={formData.email}
+              onChange={handleChange}
+              error={!!errors.email}
+              helperText={errors.email}
+            />
+            <FormControl fullWidth margin="normal" required error={!!errors.role}>
+              <InputLabel id="role-label">Role</InputLabel>
+              <Select
+                labelId="role-label"
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                label="Role"
+              >
+                {roles && roles.length > 0 ? (
+                  roles.map((role) => (
+                    <MenuItem key={role._id} value={role._id}>
+                      {role.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>Loading roles...</MenuItem>
+                )}
+              </Select>
+              {errors.role && (
+                <Typography color="error" variant="caption">
+                  {errors.role}
+                </Typography>
+              )}
+            </FormControl>
+            {getRoleName(formData.role) !== 'admin' && (
+              <FormControl fullWidth margin="normal" required>
+                <InputLabel id="class-label">Class</InputLabel>
+                <Select
+                  labelId="class-label"
+                  id="class"
+                  name="class"
+                  value={formData.class}
+                  onChange={handleChange}
+                  label="Class"
+                  error={!!errors.class}
+                >
+                  {classes.map((cls) => (
+                    <MenuItem key={cls._id} value={cls._id}>
+                      {cls.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {errors.class && (
+                  <Typography color="error" variant="caption">
+                    {errors.class}
+                  </Typography>
+                )}
+              </FormControl>
+            )}
+            {getRoleName(formData.role) === 'teacher' && (
+              <FormControl fullWidth margin="normal" required>
+                <InputLabel id="subject-label">Subject</InputLabel>
+                <Select
+                  labelId="subject-label"
+                  id="subject"
+                  name="subject"
+                  value={formData.subject}
+                  onChange={handleChange}
+                  label="Subject"
+                  error={!!errors.subject}
+                  disabled={!formData.class}
+                >
+                  {subjects.length > 0 ? (
+                    subjects.map((subject) => (
+                      <MenuItem key={subject._id} value={subject._id}>
+                        {subject.name}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>
+                      {formData.class ? 'No subjects available' : 'Select a class first'}
+                    </MenuItem>
+                  )}
+                </Select>
+                {errors.subject && (
+                  <Typography color="error" variant="caption">
+                    {errors.subject}
+                  </Typography>
+                )}
+              </FormControl>
+            )}
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Sign Up'}
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
+    </Container>
   );
 }

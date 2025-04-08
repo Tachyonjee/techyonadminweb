@@ -17,7 +17,17 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EditIcon from "@mui/icons-material/Edit";
 import { useNavigate } from "react-router-dom";
-import { getSubjects, getTopics, getSubtopics, getQuestionsByTopic, getQuestionsBySubtopic, getQuestionsBySubject, updateQuestion } from "../../apis/questionApi";
+import { useSelector } from "react-redux";
+import { 
+    getSubjects, 
+    getTopics, 
+    getSubtopics, 
+    getQuestionsByTopic, 
+    getQuestionsBySubtopic, 
+    getQuestionsBySubject, 
+    updateQuestion,
+    getClassList 
+} from "../../apis/questionApi";
 import { MathJaxContext } from "better-react-mathjax";
 import Latex from 'react-latex-next';
 import 'katex/dist/katex.min.css';
@@ -25,6 +35,7 @@ import Loader from "../../components/loader"
 
 const QuestionList = () => {
     const navigate = useNavigate();
+    const { user } = useSelector((state) => state.auth);
 
     const [subjects, setSubjects] = useState([]);
     const [topics, setTopics] = useState([]);
@@ -40,11 +51,23 @@ const QuestionList = () => {
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
     useEffect(() => {
-        fetchClasses();
-    }, []);
+        if (user?.role === 'teacher') {
+            // For teachers, set their assigned class and subject
+            if (user.class) {
+                setSelectedClass(user.class);
+                fetchSubjects(user.class);
+            }
+            if (user.subject) {
+                setSelectedSubject(user.subject);
+            }
+        } else {
+            // For other roles, fetch all classes
+            fetchClasses();
+        }
+    }, [user]);
 
     useEffect(() => {
-        if (selectedClass) {
+        if (selectedClass && user?.role !== 'teacher') {
             fetchSubjects();
         }
     }, [selectedClass]);
@@ -72,8 +95,8 @@ const QuestionList = () => {
         setClasses(classList);
     };
 
-    const fetchSubjects = async () => {
-        const subjectList = await getSubjects(selectedClass);
+    const fetchSubjects = async (classId = selectedClass) => {
+        const subjectList = await getSubjects(classId);
         setSubjects(subjectList);
     };
 
@@ -98,28 +121,25 @@ const QuestionList = () => {
             let questionsData = [];
             
             if (selectedSubtopic) {
-                if (!user?.role || !user?.id) {
-                    throw new Error('User role and ID are required');
-                }
-                questionsData = await getQuestionsBySubtopic(selectedSubtopic, user.role, user.id);
+                const response = await getQuestionsBySubtopic(selectedSubtopic);
+                console.log('Questions by subtopic response:', response);
+                questionsData = response?.data || [];
             } else if (selectedTopic) {
-                if (!user?.role || !user?.id) {
-                    throw new Error('User role and ID are required');
-                }
-                questionsData = await getQuestionsByTopic(selectedTopic, user.role, user.id);
+                const response = await getQuestionsByTopic(selectedTopic);
+                console.log('Questions by topic response:', response);
+                questionsData = response?.data || [];
             } else if (selectedSubject) {
-                if (!user?.role || !user?.id) {
-                    throw new Error('User role and ID are required');
-                }
-                questionsData = await getQuestionsBySubject(selectedSubject, user.role, user.id);
+                const response = await getQuestionsBySubject(selectedSubject);
+                console.log('Questions by subject response:', response);
+                questionsData = response?.data || [];
             }
 
-            // Filter questions based on user's access
-            const accessibleQuestions = questionsData.filter(question => canAccessQuestion(question));
-            setQuestions(accessibleQuestions);
+            console.log('Final questions data:', questionsData);
+            setQuestions(Array.isArray(questionsData) ? questionsData : []);
         } catch (error) {
             console.error('Error fetching questions:', error);
-            showError(error.message || 'Failed to fetch questions');
+            const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch questions';
+            showError(errorMessage);
             setQuestions([]);
         } finally {
             setLoading(false);
@@ -150,12 +170,19 @@ const QuestionList = () => {
                             <Select
                                 value={selectedClass}
                                 onChange={(e) => setSelectedClass(e.target.value)}
+                                disabled={user?.role === 'teacher'}
                             >
-                                {classes.map((item) => (
-                                    <MenuItem key={item._id} value={item._id}>
-                                        {item.name}
+                                {user?.role === 'teacher' ? (
+                                    <MenuItem value={user.class}>
+                                        {classes.find(c => c._id === user.class)?.name || 'Loading...'}
                                     </MenuItem>
-                                ))}
+                                ) : (
+                                    classes.map((item) => (
+                                        <MenuItem key={item._id} value={item._id}>
+                                            {item.name}
+                                        </MenuItem>
+                                    ))
+                                )}
                             </Select>
                         </FormControl>
                     </Grid>
@@ -167,12 +194,19 @@ const QuestionList = () => {
                             <Select
                                 value={selectedSubject}
                                 onChange={(e) => setSelectedSubject(e.target.value)}
+                                disabled={user?.role === 'teacher'}
                             >
-                                {subjects.map((item) => (
-                                    <MenuItem key={item._id} value={item._id}>
-                                        {item.name}
+                                {user?.role === 'teacher' ? (
+                                    <MenuItem value={user.subject}>
+                                        {subjects.find(s => s._id === user.subject)?.name || 'Loading...'}
                                     </MenuItem>
-                                ))}
+                                ) : (
+                                    subjects.map((item) => (
+                                        <MenuItem key={item._id} value={item._id}>
+                                            {item.name}
+                                        </MenuItem>
+                                    ))
+                                )}
                             </Select>
                         </FormControl>
                     </Grid>
@@ -212,65 +246,67 @@ const QuestionList = () => {
                     </Grid>
                 </Grid>
                 {loading &&<Loader loading={loading} />}
-                {questions.length === 0 && !loading? (
+                {!loading && (!Array.isArray(questions) || questions.length === 0) ? (
                     <Typography>No questions found.</Typography>
                 ) : (
-                    questions.map((q, index) => (
-                        <Accordion key={q._id || index} className="mb-4">
-                            <AccordionSummary
-                                expandIcon={<ExpandMoreIcon />}
-                                className="flex justify-between items-center w-full bg-gradient-to-r from-blue-100 to-purple-300"
-                            >
-                                <div className="flex items-center w-full">
-                                    <Typography variant="subtitle1" className="font-semibold flex flex-1">
-                                        Q{index + 1}:{"     "}
-                                        {q.questionText ? (
-                                            <span className="ml-2"><Latex>{q.questionText || ""}</Latex></span>
-                                        ) : (
-                                            "No question text available"
-                                        )}
-                                    </Typography>
+                    <MathJaxContext>
+                        {Array.isArray(questions) && questions.map((q, index) => (
+                            <Accordion key={q._id || index} className="mb-4">
+                                <AccordionSummary
+                                    expandIcon={<ExpandMoreIcon />}
+                                    className="flex justify-between items-center w-full bg-gradient-to-r from-blue-100 to-purple-300"
+                                >
+                                    <div className="flex items-center w-full">
+                                        <Typography variant="subtitle1" className="font-semibold flex flex-1">
+                                            Q{index + 1}:{"     "}
+                                            {q.questionText ? (
+                                                <span className="ml-2"><Latex>{q.questionText || ""}</Latex></span>
+                                            ) : (
+                                                "No question text available"
+                                            )}
+                                        </Typography>
                                         <IconButton onClick={() => handleEdit(q)} size="small">
                                             <EditIcon />
                                         </IconButton>
-                                </div>
-                            </AccordionSummary>
-
-                            <AccordionDetails className="space-y-3 bg-gradient-to-r from-blue-100 to-purple-200">
-                                {q.questionType === "mcq" && q.options && Object.keys(q.options).length > 0 && (
-                                    <div className="space-y-2 mb-2 m-10">
-                                        <Typography><strong>Options:</strong></Typography>
-                                        {Object.entries(q.options).map(([key, value]) => (
-                                            <Typography key={key} className="flex flex-1 mt-1">
-                                                {key.toUpperCase()} : {" "}
-                                                {value ? (
-                                                    <span className="ml-3"><Latex>{value || ""}</Latex></span>
-                                                ) : (
-                                                    "No option available"
-                                                )}
-                                            </Typography>
-                                        ))}
-                                        <Typography className="mt-2">
-                                            <strong>Correct Option:</strong>{" "}
-                                            {q.correctAnswerOption ? q.correctAnswerOption.toUpperCase() : "Not provided"}
-                                        </Typography>
                                     </div>
-                                )}
-                                {q.correctAnswerText && (
-                                    <Typography>
-                                        <strong>Correct Answer:</strong>{" "}
-                                        <Latex>{q.correctAnswerText || ""}</Latex>
-                                    </Typography>
-                                )}
-                                {q.answerExplanation && (
-                                    <Typography>
-                                        <strong>Explanation:</strong>{" "}
-                                      <Latex>{q.answerExplanation || ""}</Latex>
-                                    </Typography>
-                                )}
-                            </AccordionDetails>
-                        </Accordion>
-                    ))
+                                </AccordionSummary>
+
+                                <AccordionDetails className="space-y-3 bg-gradient-to-r from-blue-100 to-purple-200">
+                                    {q.questionType === "mcq" && q.options && Object.keys(q.options).length > 0 && (
+                                        <div className="space-y-2 mb-2 m-10">
+                                            <Typography><strong>Options:</strong></Typography>
+                                            {Object.entries(q.options).map(([key, value]) => (
+                                                <Typography key={key} className="flex flex-1 mt-1">
+                                                    {key.toUpperCase()} : {" "}
+                                                    {value ? (
+                                                        <span className="ml-3"><Latex>{value || ""}</Latex></span>
+                                                    ) : (
+                                                        "No option available"
+                                                    )}
+                                                </Typography>
+                                            ))}
+                                            <Typography className="mt-2">
+                                                <strong>Correct Option:</strong>{" "}
+                                                {q.correctAnswerOption ? q.correctAnswerOption.toUpperCase() : "Not provided"}
+                                            </Typography>
+                                        </div>
+                                    )}
+                                    {q.correctAnswerText && (
+                                        <Typography>
+                                            <strong>Correct Answer:</strong>{" "}
+                                            <Latex>{q.correctAnswerText || ""}</Latex>
+                                        </Typography>
+                                    )}
+                                    {q.answerExplanation && (
+                                        <Typography>
+                                            <strong>Explanation:</strong>{" "}
+                                            <Latex>{q.answerExplanation || ""}</Latex>
+                                        </Typography>
+                                    )}
+                                </AccordionDetails>
+                            </Accordion>
+                        ))}
+                    </MathJaxContext>
                 )}
 
             </Card>

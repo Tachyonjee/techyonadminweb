@@ -7,6 +7,7 @@
     "@emotion/styled": "^11.11.5",
     "@mui/icons-material": "^6.4.6",
     "@mui/material": "^5.15.4",
+    "@reduxjs/toolkit": "^2.6.1",
     "axios": "^1.8.1",
     "better-react-mathjax": "^2.1.0",
     "mathquill": "^0.10.1-a",
@@ -16,7 +17,9 @@
     "react-latex-next": "^3.0.0",
     "react-mathquill": "^1.0.3",
     "react-quill": "^2.0.0",
-    "react-router-dom": "^6.20.1"
+    "react-redux": "^9.2.0",
+    "react-router-dom": "^6.20.1",
+    "redux-persist": "^6.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",

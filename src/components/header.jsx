@@ -1,28 +1,60 @@
-import React from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { AppBar, Toolbar, Box, Typography, Button } from '@mui/material';
-import { Dashboard, Person, LockOpen, VpnKey } from '@mui/icons-material';
-import LogoutIcon from '@mui/icons-material/Logout';
+import React, { useState } from 'react';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { logout } from '../redux/slices/authSlice';
+import {
+  AppBar,
+  Toolbar,
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  useTheme,
+  Menu,
+  MenuItem,
+} from '@mui/material';
+import {
+  Dashboard,
+  Person,
+  LockOpen,
+  VpnKey,
+  Logout as LogoutIcon,
+  Quiz as QuizIcon,
+  KeyboardArrowDown
+} from '@mui/icons-material';
 
-const Header = () => {
+export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch();
+  const { user, role } = useSelector((state) => state.auth);
+  const theme = useTheme();
+  const [anchorEl, setAnchorEl] = useState(null);
 
-  // Check user login status from localStorage
-  const user = JSON.parse(localStorage.getItem('user'))
-  const role = localStorage.getItem('role');
-
-  const handleLogout = () => {
-    localStorage.removeItem('user'); // Remove user data
-    navigate('/signin'); // Redirect to Signin
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
   };
 
-  // Role-based dashboard routing
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleQuestionMenuClick = (path) => {
+    navigate(path);
+    handleMenuClose();
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate('/signin');
+  };
+
   const getDashboardPath = () => {
     switch (role) {
       case 'admin':
-        return '/admin/dashboard';
+        return '/admin/question-setup';
       case 'teacher':
-        return '/teacher/dashboard';
+        return '/questions';
       case 'student':
         return '/student/dashboard';
       default:
@@ -30,93 +62,141 @@ const Header = () => {
     }
   };
 
+  const isQuestionRoute = location.pathname.includes('/questions');
+  const isDashboardRoute = location.pathname === getDashboardPath();
+
   return (
-    <AppBar
-      position="sticky"
+    <AppBar 
+      position="sticky" 
       elevation={3}
       sx={{
         backdropFilter: 'blur(10px)',
         backgroundColor: 'rgba(255, 255, 255, 0.8)',
         borderRadius: '20px',
-        margin: 'auto',
+        margin: '10px auto',
         width: '90%',
         px: 2,
-        top: 10,
       }}
     >
-      <Toolbar disableGutters className="flex justify-between w-full">
-        {/* Logo/Brand */}
-        <Link to="/" className="flex items-center ">
-          <img src="/assets/images/logo.png" alt="Logo" className="h-20 w-20 object-contain rounded-full" />
-          <span className="sr-only">Techyon</span> {/* For screen readers */}
+      <Toolbar>
+        <Link 
+          to="/" 
+          style={{ 
+            textDecoration: 'none', 
+            color: theme.palette.text.primary,
+            display: 'flex',
+            alignItems: 'center'
+          }}
+        >
+          <img 
+            src="/assets/images/logo.png" 
+            alt="Logo" 
+            style={{ 
+              height: '50px',
+              width: '50px',
+              objectFit: 'contain',
+              marginRight: '10px'
+            }} 
+          />
+          <Typography variant="h6" component="div">
+            Techyon Admin
+          </Typography>
         </Link>
 
-        {/* Navigation Links */}
-        <Box className="flex gap-4 items-center">
-          {user && (
-            <NavLink
-              to={getDashboardPath()}
-              className={({ isActive }) =>
-                `flex items-center gap-1 px-2 py-1 rounded-md ${
-                  isActive ? 'bg-gray-200' : ''
-                }`
-              }
-              style={{ textDecoration: 'none', color: '#334155', fontWeight: 500 }}
-            >
-              <Dashboard fontSize="small" />
-              Dashboard
-            </NavLink>
-          )}
+        <Box sx={{ flexGrow: 1 }} />
 
-          {!user && (
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          {user ? (
             <>
-              <NavLink
-                to="/signup"
-                className={({ isActive }) =>
-                  `flex items-center gap-1 px-2 py-1 rounded-md ${
-                    isActive ? 'bg-gray-200' : ''
-                  }`
-                }
-                style={{ textDecoration: 'none', color: '#334155', fontWeight: 500 }}
+              <Button
+                component={NavLink}
+                to={getDashboardPath()}
+                startIcon={<Dashboard />}
+                sx={{
+                  color: theme.palette.text.primary,
+                  backgroundColor: isDashboardRoute ? theme.palette.action.selected : 'transparent',
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover,
+                  }
+                }}
               >
-                <LockOpen fontSize="small" />
-                Sign Up
-              </NavLink>
-
-              <NavLink
-                to="/signin"
-                className={({ isActive }) =>
-                  `flex items-center gap-1 px-2 py-1 rounded-md ${
-                    isActive ? 'bg-gray-200' : ''
-                  }`
-                }
-                style={{ textDecoration: 'none', color: '#334155', fontWeight: 500 }}
+                Dashboard
+              </Button>
+              {role === 'teacher' && (
+                <>
+                  <Button
+                    onClick={handleMenuOpen}
+                    startIcon={<QuizIcon />}
+                    endIcon={<KeyboardArrowDown />}
+                    sx={{
+                      color: theme.palette.text.primary,
+                      backgroundColor: isQuestionRoute ? theme.palette.action.selected : 'transparent',
+                      '&:hover': {
+                        backgroundColor: theme.palette.action.hover,
+                      }
+                    }}
+                  >
+                    Manage Questions
+                  </Button>
+                  <Menu
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={handleMenuClose}
+                  >
+                    <MenuItem onClick={() => handleQuestionMenuClick('/questions')}>
+                      Question List
+                    </MenuItem>
+                    <MenuItem onClick={() => handleQuestionMenuClick('/questions/create')}>
+                      Create Question
+                    </MenuItem>
+                  </Menu>
+                </>
+              )}
+              <Button
+                component={NavLink}
+                to="/profile"
+                startIcon={<Person />}
+                sx={{
+                  color: theme.palette.text.primary,
+                  backgroundColor: location.pathname === '/profile' ? theme.palette.action.selected : 'transparent',
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover,
+                  }
+                }}
               >
-                <VpnKey fontSize="small" />
-                Sign In
-              </NavLink>
+                Profile
+              </Button>
+              <IconButton
+                onClick={handleLogout}
+                sx={{
+                  color: theme.palette.text.primary,
+                }}
+              >
+                <LogoutIcon />
+              </IconButton>
             </>
-          )}
-
-          {user && (
-            <Button
-              onClick={handleLogout}
-              className="flex items-center gap-1 px-2 py-1 rounded-md"
-              sx={{
-                textTransform: 'none',
-                color: '#334155',
-                fontWeight: 500,
-                padding: '6px 10px',
-              }}
-              startIcon={<LogoutIcon fontSize="small" />}
-            >
-              Logout
-            </Button>
+          ) : (
+            <>
+              <Button
+                component={Link}
+                to="/signin"
+                startIcon={<LockOpen />}
+                sx={{ color: theme.palette.text.primary }}
+              >
+                Sign In
+              </Button>
+              <Button
+                component={Link}
+                to="/signUp"
+                startIcon={<VpnKey />}
+                sx={{ color: theme.palette.text.primary }}
+              >
+                Sign Up
+              </Button>
+            </>
           )}
         </Box>
       </Toolbar>
     </AppBar>
   );
-};
-
-export default Header;
+}
